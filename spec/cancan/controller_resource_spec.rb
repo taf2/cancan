@@ -286,7 +286,7 @@ describe CanCan::ControllerResource do
     category = Object.new
     stub(@controller).category { category }
     stub(category).children.stub!.find(123) { :some_project }
-    resource = CanCan::ControllerResource.new(@controller, :through => :category, :name_in_parent => :children)
+    resource = CanCan::ControllerResource.new(@controller, :through => :category, :through_association => :children)
     resource.load_resource
     @controller.instance_variable_get(:@project).should == :some_project
   end
