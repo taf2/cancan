@@ -61,11 +61,21 @@ module CanCan
     end
 
     def build_resource
+      # puts "About to build new resource"
+      # puts "Resource base is #{resource_base.inspect}"
+      
       resource = resource_base.send(@options[:singleton] ? "build_#{name}" : "new")
+      
+      # puts "Built resource: #{resource.inspect}"
 
       # If this resource has and belongs to many of the parent resource elements, the parent must be added to this resource's parent array
-      if (parent_resource_through && resource.respond_to?(parent_resource_through.to_s.pluralize))
-        resource.send("#{parent_resource_through.to_s.pluralize}") << parent_resource
+      if @options[:parent_resource_name]
+        if @options[:parent_singleton]
+          resource.send("#{@options[:parent_resource_name]}=", parent_resource)
+        else
+          resource.send("#{@options[:parent_resource_name]}") << parent_resource
+        end
+        
         resource_base.send("delete", resource)
       end
       
@@ -73,6 +83,7 @@ module CanCan
         resource.send("#{name}=", value)
       end
       resource.attributes = @params[name] if @params[name]
+      
       resource
     end
 
