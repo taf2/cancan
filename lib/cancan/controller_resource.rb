@@ -181,11 +181,6 @@ module CanCan
     def parent_resource
       @options[:through] && [@options[:through]].flatten.map { |i| fetch_parent(i) }.compact.first
     end
-    
-    # Gets the name of the parent to load the resource through
-    def parent_resource_through
-      @options[:through] && [@options[:through]].flatten.map { |i| fetch_parent(i) ? i : nil }.compact.first
-    end
 
     def fetch_parent(name)
       if @controller.instance_variable_defined? "@#{name}"

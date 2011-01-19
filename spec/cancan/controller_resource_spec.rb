@@ -323,16 +323,6 @@ describe CanCan::ControllerResource do
     resource.load_resource
     @controller.instance_variable_get(:@project).should == project
   end
-  
-  it "should allow you to specify the name of the child resource as specified in the parent" do
-    @params.merge!(:action => "show", :id => 123)
-    category = Object.new
-    stub(@controller).category { category }
-    stub(category).children.stub!.find(123) { :some_project }
-    resource = CanCan::ControllerResource.new(@controller, :through => :category, :through_association => :children)
-    resource.load_resource
-    @controller.instance_variable_get(:@project).should == :some_project
-  end
 
   it "should raise ImplementationRemoved when adding :name option" do
     lambda {
