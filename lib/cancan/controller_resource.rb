@@ -26,19 +26,36 @@ module CanCan
     end
 
     def load_resource
-      if parent? || member_action?
-        self.resource_instance ||= load_resource_instance
-      elsif load_collection?
-        self.collection_instance ||= load_collection
+      unless skip?(:load)
+        if load_instance?
+          self.resource_instance ||= load_resource_instance
+        elsif load_collection?
+          self.collection_instance ||= load_collection
+        end
       end
     end
 
     def authorize_resource
-      @controller.authorize!(authorization_action, resource_instance || resource_class_with_parent)
+      unless skip?(:authorize)
+        @controller.authorize!(authorization_action, resource_instance || resource_class_with_parent)
+      end
     end
 
     def parent?
       @options.has_key?(:parent) ? @options[:parent] : @name && @name != name_from_controller.to_sym
+    end
+
+    def skip?(behavior) # This could probably use some refactoring
+      options = @controller.class.cancan_skipper[behavior][@name]
+      if options.nil?
+        false
+      elsif options == {}
+        true
+      elsif options[:except] && ![options[:except]].flatten.include?(@params[:action].to_sym)
+        true
+      elsif [options[:only]].flatten.include?(@params[:action].to_sym)
+        true
+      end
     end
 
     protected
@@ -51,9 +68,12 @@ module CanCan
       end
     end
 
+    def load_instance?
+      parent? || member_action?
+    end
+
     def load_collection?
-      resource_base.respond_to?(:accessible_by) &&
-      !current_ability.has_block?(authorization_action, resource_class)
+      resource_base.respond_to?(:accessible_by) && !current_ability.has_block?(authorization_action, resource_class)
     end
 
     def load_collection
@@ -61,13 +81,9 @@ module CanCan
     end
 
     def build_resource
-      # puts "About to build new resource"
-      # puts "Resource base is #{resource_base.inspect}"
+      method_name = @options[:singleton] && resource_base.respond_to?("build_#{name}") ? "build_#{name}" : "new"
+      resource = resource_base.send(method_name, @params[name] || {})
       
-      resource = resource_base.send(@options[:singleton] ? "build_#{name}" : "new")
-      
-      # puts "Built resource: #{resource.inspect}"
-
       # If this resource has and belongs to many of the parent resource elements, the parent must be added to this resource's parent array
       if @options[:parent_resource_name]
         if @options[:parent_singleton]
@@ -82,17 +98,17 @@ module CanCan
       initial_attributes.each do |name, value|
         resource.send("#{name}=", value)
       end
-      resource.attributes = @params[name] if @params[name]
-      
       resource
     end
 
     def initial_attributes
-      current_ability.attributes_for(@params[:action].to_sym, resource_class)
+      current_ability.attributes_for(@params[:action].to_sym, resource_class).delete_if do |key, value|
+        @params[name] && @params[name].include?(key)
+      end
     end
 
     def find_resource
-      if @options[:singleton]
+      if @options[:singleton] && resource_base.respond_to?(name)
         resource_base.send(name)
       else
         @options[:find_by] ? resource_base.send("find_by_#{@options[:find_by]}!", id_param) : resource_base.find(id_param)
@@ -132,7 +148,7 @@ module CanCan
     end
 
     def resource_instance
-      @controller.instance_variable_get("@#{instance_name}")
+      @controller.instance_variable_get("@#{instance_name}") if load_instance?
     end
 
     def collection_instance=(instance)

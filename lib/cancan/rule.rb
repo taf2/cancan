@@ -2,8 +2,8 @@ module CanCan
   # This class is used internally and should only be called through Ability.
   # it holds the information about a "can" call made on Ability and provides
   # helpful methods to determine permission checking and conditions hash generation.
-  class CanDefinition # :nodoc:
-    attr_reader :base_behavior, :actions
+  class Rule # :nodoc:
+    attr_reader :base_behavior, :actions, :conditions
     attr_writer :expanded_actions
 
     # The first argument when initializing is the base_behavior which is a true/false
@@ -38,18 +38,6 @@ module CanCan
       else
         # Don't stop at "cannot" definitions when there are conditions.
         @conditions.empty? ? true : @base_behavior
-      end
-    end
-
-    def tableized_conditions(conditions = @conditions)
-      return conditions unless conditions.kind_of? Hash
-      conditions.inject({}) do |result_hash, (name, value)|
-        if value.kind_of? Hash
-          name = name.to_s.tableize.to_sym
-          value = tableized_conditions(value)
-        end
-        result_hash[name] = value
-        result_hash
       end
     end
 
@@ -97,22 +85,34 @@ module CanCan
     end
 
     def matches_subject_class?(subject)
-      @subjects.any? { |sub| sub.kind_of?(Module) && (subject.kind_of?(sub) || subject.kind_of?(Module) && subject.ancestors.include?(sub)) }
+      @subjects.any? { |sub| sub.kind_of?(Module) && (subject.kind_of?(sub) || subject.class.to_s == sub.to_s || subject.kind_of?(Module) && subject.ancestors.include?(sub)) }
     end
 
+    # Checks if the given subject matches the given conditions hash.
+    # This behavior can be overriden by a model adapter by defining two class methods:
+    # override_matching_for_conditions?(subject, conditions) and
+    # matches_conditions_hash?(subject, conditions)
     def matches_conditions_hash?(subject, conditions = @conditions)
-      conditions.all? do |name, value|
-        attribute = subject.send(name)
-        if value.kind_of?(Hash)
-          if attribute.kind_of? Array
-            attribute.any? { |element| matches_conditions_hash? element, value }
-          else
-            matches_conditions_hash? attribute, value
-          end
-        elsif value.kind_of?(Array) || value.kind_of?(Range)
-          value.include? attribute
+      if conditions.empty?
+        true
+      else
+        if model_adapter(subject).override_conditions_hash_matching? subject, conditions
+          model_adapter(subject).matches_conditions_hash? subject, conditions
         else
-          attribute == value
+          conditions.all? do |name, value|
+            attribute = subject.send(name)
+            if value.kind_of?(Hash)
+              if attribute.kind_of? Array
+                attribute.any? { |element| matches_conditions_hash? element, value }
+              else
+                matches_conditions_hash? attribute, value
+              end
+            elsif value.kind_of?(Array) || value.kind_of?(Range)
+              value.include? attribute
+            else
+              attribute == value
+            end
+          end
         end
       end
     end
@@ -128,6 +128,10 @@ module CanCan
       else
         @block.call(action, subject.class, subject, *extra_args)
       end
+    end
+
+    def model_adapter(subject)
+      ModelAdapters::AbstractAdapter.adapter_class(subject_class?(subject) ? subject : subject.class)
     end
   end
 end

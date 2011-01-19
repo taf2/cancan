@@ -32,7 +32,7 @@ describe CanCan::Ability do
     @ability.can?(:read, Symbol).should be_true
   end
 
-  it "should pass to previous can definition, if block returns false or nil" do
+  it "should pass to previous rule, if block returns false or nil" do
     @ability.can :read, Symbol
     @ability.can :read, Integer do |i|
       i < 5
@@ -144,7 +144,7 @@ describe CanCan::Ability do
     @ability.can?(:update, 123).should be_false
   end
 
-  it "should support custom objects in the can definition" do
+  it "should support custom objects in the rule" do
     @ability.can :read, :stats
     @ability.can?(:read, :stats).should be_true
     @ability.can?(:update, :stats).should be_false
@@ -165,7 +165,7 @@ describe CanCan::Ability do
     @ability.can?(:read, 123).should be_false
   end
 
-  it "should pass to previous can definition, if block returns false or nil" do
+  it "should pass to previous rule, if block returns false or nil" do
     @ability.can :read, :all
     @ability.cannot :read, Integer do |int|
       int > 10 ? nil : ( int > 5 )
@@ -341,6 +341,14 @@ describe CanCan::Ability do
     else
       fail "Expected CanCan::AccessDenied exception to be raised"
     end
+  end
+
+  it "should determine model adapter class by asking AbstractAdapter" do
+    model_class = Object.new
+    adapter_class = Object.new
+    stub(CanCan::ModelAdapters::AbstractAdapter).adapter_class(model_class) { adapter_class }
+    stub(adapter_class).new(model_class, []) { :adapter_instance }
+    @ability.model_adapter(model_class, :read).should == :adapter_instance
   end
 
   describe "unauthorized message" do

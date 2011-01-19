@@ -71,6 +71,10 @@ module CanCan
       # [:+through+]
       #   Load this resource through another one. This should match the name of the parent instance variable or method.
       #
+      # [:+through_association+]
+      #   The name of the association to fetch the child records through the parent resource. This is normally not needed
+      #   because it defaults to the pluralized resource name.
+      #
       # [:+shallow+]
       #   Pass +true+ to allow this resource to be loaded directly when parent is +nil+. Defaults to +false+.
       #
@@ -162,6 +166,52 @@ module CanCan
         cancan_resource_class.add_before_filter(self, :authorize_resource, *args)
       end
 
+      # Skip both the loading and authorization behavior of CanCan for this given controller. This is primarily
+      # useful to skip the behavior of a superclass. You can pass :only and :except options to specify which actions
+      # to skip the effects on. It will apply to all actions by default.
+      #
+      #   class ProjectsController < SomeOtherController
+      #     skip_load_and_authorize_resource :only => :index
+      #   end
+      #
+      # You can also pass the resource name as the first argument to skip that resource.
+      def skip_load_and_authorize_resource(*args)
+        skip_load_resource(*args)
+        skip_authorize_resource(*args)
+      end
+
+      # Skip both the loading behavior of CanCan. This is useful when using +load_and_authorize_resource+ but want to
+      # only do authorization on certain actions. You can pass :only and :except options to specify which actions to
+      # skip the effects on. It will apply to all actions by default.
+      #
+      #   class ProjectsController < ApplicationController
+      #     load_and_authorize_resource
+      #     skip_load_resource :only => :index
+      #   end
+      #
+      # You can also pass the resource name as the first argument to skip that resource.
+      def skip_load_resource(*args)
+        options = args.extract_options!
+        name = args.first
+        cancan_skipper[:load][name] = options
+      end
+
+      # Skip both the authorization behavior of CanCan. This is useful when using +load_and_authorize_resource+ but want to
+      # only do loading on certain actions. You can pass :only and :except options to specify which actions to
+      # skip the effects on. It will apply to all actions by default.
+      #
+      #   class ProjectsController < ApplicationController
+      #     load_and_authorize_resource
+      #     skip_authorize_resource :only => :index
+      #   end
+      #
+      # You can also pass the resource name as the first argument to skip that resource.
+      def skip_authorize_resource(*args)
+        options = args.extract_options!
+        name = args.first
+        cancan_skipper[:authorize][name] = options
+      end
+
       # Add this to a controller to ensure it performs authorization through +authorized+! or +authorize_resource+ call.
       # If neither of these authorization methods are called, a CanCan::AuthorizationNotPerformed exception will be raised.
       # This is normally added to the ApplicationController to ensure all controller actions do authorization.
@@ -172,11 +222,11 @@ module CanCan
       #
       # Any arguments are passed to the +after_filter+ it triggers.
       #
-      # See skip_authorization to bypass this check on specific controller actions.
+      # See skip_authorization_check to bypass this check on specific controller actions.
       def check_authorization(*args)
         self.after_filter(*args) do |controller|
           unless controller.instance_variable_defined?(:@_authorized)
-            raise AuthorizationNotPerformed, "This action failed the check_authorization because it does not authorize_resource. Add skip_authorization to bypass this check."
+            raise AuthorizationNotPerformed, "This action failed the check_authorization because it does not authorize_resource. Add skip_authorization_check to bypass this check."
           end
         end
       end
@@ -184,14 +234,18 @@ module CanCan
       # Call this in the class of a controller to skip the check_authorization behavior on the actions.
       #
       #   class HomeController < ApplicationController
-      #     skip_authorization :only => :index
+      #     skip_authorization_check :only => :index
       #   end
       #
       # Any arguments are passed to the +before_filter+ it triggers.
-      def skip_authorization(*args)
+      def skip_authorization_check(*args)
         self.before_filter(*args) do |controller|
           controller.instance_variable_set(:@_authorized, true)
         end
+      end
+
+      def skip_authorization(*args)
+        raise ImplementationRemoved, "The CanCan skip_authorization method has been renamed to skip_authorization_check. Please update your code."
       end
 
       def cancan_resource_class
@@ -200,6 +254,10 @@ module CanCan
         else
           ControllerResource
         end
+      end
+
+      def cancan_skipper
+        @_cancan_skipper ||= {:authorize => {}, :load => {}}
       end
     end
 
@@ -236,7 +294,7 @@ module CanCan
     #
     #   class ApplicationController < ActionController::Base
     #     rescue_from CanCan::AccessDenied do |exception|
-    #       flash[:error] = exception.message
+    #       flash[:alert] = exception.message
     #       redirect_to root_url
     #     end
     #   end

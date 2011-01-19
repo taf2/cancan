@@ -1,6 +1,7 @@
 module CanCan
-  # This module is automatically included into all Active Record models.
-  module ActiveRecordAdditions
+
+  # This module adds the accessible_by class method to a model. It is included in the model adapters.
+  module ModelAdditions
     module ClassMethods
       # Returns a scope which fetches only the records that the passed ability
       # can perform a given action on. The action defaults to :read. This
@@ -17,26 +18,14 @@ module CanCan
       #
       #   @articles = Article.accessible_by(current_ability, :update)
       #
-      # Here only the articles which the user can update are returned. This
-      # internally uses Ability#conditions method, see that for more information.
+      # Here only the articles which the user can update are returned.
       def accessible_by(ability, action = :read)
-        query = ability.query(action, self)
-        if respond_to? :where
-          where(query.conditions).joins(query.joins)
-        else
-          scoped(:conditions => query.conditions, :joins => query.joins)
-        end
+        ability.model_adapter(self, action).database_records
       end
     end
 
     def self.included(base)
       base.extend ClassMethods
     end
-  end
-end
-
-if defined? ActiveRecord
-  ActiveRecord::Base.class_eval do
-    include CanCan::ActiveRecordAdditions
   end
 end

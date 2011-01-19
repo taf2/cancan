@@ -1,3 +1,37 @@
+1.5.0 (January 11, 2011)
+
+* Added an Ability generator - see issue #170
+
+* Added DataMapper support (thanks natemueller)
+
+* Added Mongoid support (thanks bowsersenior)
+
+* Added skip_load_and_authorize_resource methods to controller class - see issue #164
+
+* Added support for uncountable resources in index action - see issue #193
+
+* Cleaned up README and added spec/README
+
+* Internal: renamed CanDefinition to Rule
+
+* Internal: added a model adapter layer for easily supporting more ORMs
+
+* Internal: added .rvmrc to auto-switch to 1.8.7 with gemset - see issue #231
+
+
+1.4.1 (November 12, 2010)
+
+* Renaming skip_authorization to skip_authorization_check - see issue #169
+
+* Adding :through_association option to load_resource (thanks hunterae) - see issue #171
+
+* The :shallow option now works with the :singleton option (thanks nandalopes) - see issue #187
+
+* Play nicely with quick_scopes gem (thanks ramontayag) - see issue #183
+
+* Fix odd behavior when "cache_classes = false" (thanks mphalliday) - see issue #174
+
+
 1.4.0 (October 5, 2010)
 
 * Adding Gemfile; to get specs running just +bundle+ and +rake+ - see issue #163
