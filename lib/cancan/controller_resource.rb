@@ -44,6 +44,15 @@ module CanCan
     def parent?
       @options.has_key?(:parent) ? @options[:parent] : @name && @name != name_from_controller.to_sym
     end
+    
+    def parent_resource_name
+      if @options[:parent_resource_name]
+        @options[:parent_resource_name]
+      elsif @options[:through]
+        parent = [@options[:through]].flatten.map { |i| p = fetch_parent(i) ? i : nil }.compact.first
+        @options[:parent_singleton] ? parent.to_s.singularize : parent.to_s.pluralize
+      end
+    end
 
     def skip?(behavior) # This could probably use some refactoring
       options = @controller.class.cancan_skipper[behavior][@name]
@@ -85,11 +94,11 @@ module CanCan
       resource = resource_base.send(method_name, @params[name] || {})
       
       # If this resource has and belongs to many of the parent resource elements, the parent must be added to this resource's parent array
-      if @options[:parent_resource_name]
+      if @options[:many_to_many] or @options[:parent_resource_name].present? or @options[:parent_singleton].present?
         if @options[:parent_singleton]
-          resource.send("#{@options[:parent_resource_name]}=", parent_resource)
+          resource.send("#{parent_resource_name}=", parent_resource)
         else
-          resource.send("#{@options[:parent_resource_name]}") << parent_resource
+          resource.send("#{parent_resource_name}") << parent_resource
         end
         
         resource_base.send("delete", resource)
